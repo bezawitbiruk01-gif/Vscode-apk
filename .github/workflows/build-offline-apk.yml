@@ -73,15 +73,16 @@ jobs:
           sha256sum ../vscode-main-source.zip | tee ../vscode-main-source.zip.sha256
           unzip -Z1 ../vscode-main-source.zip | wc -l | tee ../vscode-main-source.file-count
 
-      - name: Package complete Web distribution and source archive
+      - name: Package complete Web distribution and full source archive
         run: |
-          rm -rf mobile/app/src/main/assets/vscode-web
-          mkdir -p mobile/app/src/main/assets/vscode-web
-          cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/vscode-web/
-          cp vscode-src/vscode-main/../vscode-main-source.zip mobile/app/src/main/assets/
-          cp vscode-src/vscode-main/../vscode-main-source.zip.sha256 mobile/app/src/main/assets/
-          cp vscode-src/vscode-main/../vscode-main-source.file-count mobile/app/src/main/assets/
-          cp mobile/app/src/main/assets/index.html mobile/app/src/main/assets/launcher.html
+          rm -rf mobile/app/src/main/assets/vscode
+          mkdir -p mobile/app/src/main/assets/vscode
+          cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/vscode/
+          cp vscode-src/vscode-main-source.zip mobile/app/src/main/assets/
+          cp vscode-src/vscode-main-source.zip.sha256 mobile/app/src/main/assets/
+          cp vscode-src/vscode-main-source.file-count mobile/app/src/main/assets/
+          test -f mobile/app/src/main/assets/vscode/out/vs/workbench/workbench.web.main.internal.js
+          test -f mobile/app/src/main/assets/index.html
 
       - name: Build standalone Android debug APK
         working-directory: mobile
