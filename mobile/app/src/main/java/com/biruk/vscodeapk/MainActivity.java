@@ -19,7 +19,6 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends Activity {
 
     private static final String APP_ASSET_HOST = "appassets.androidplatform.net";
-    private static final String ENTRY_URL = "https://" + APP_ASSET_HOST + "/assets/vscode/index.html";
     private WebView webView;
     private WebViewAssetLoader assetLoader;
 
@@ -70,7 +69,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl(ENTRY_URL);
+        webView.loadUrl("https://" + APP_ASSET_HOST + "/assets/index.html");
     }
 
     @Override
