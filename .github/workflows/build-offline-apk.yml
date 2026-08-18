@@ -6,7 +6,7 @@ on:
       vscode_ref:
         description: 'VS Code ref (branch, tag, or commit)'
         required: false
-        default: 'main'
+        default: '1.135.0'
   push:
     branches: [ main ]
 
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 env:
-  VSCODE_REF: ${{ github.event.inputs.vscode_ref || 'main' }}
+  VSCODE_REF: ${{ github.event.inputs.vscode_ref || '1.135.0' }}
 
 jobs:
   build:
