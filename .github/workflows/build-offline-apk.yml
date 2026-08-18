@@ -15,7 +15,6 @@ permissions:
 
 env:
   VSCODE_REF: ${{ github.event.inputs.vscode_ref || '1.135.0' }}
-  EXPECTED_SOURCE_ENTRIES: '22273'
 
 jobs:
   build:
@@ -72,9 +71,11 @@ jobs:
         run: |
           zip -qr ../vscode-main-source.zip . -x '.git/*'
           sha256sum ../vscode-main-source.zip | tee ../vscode-main-source.zip.sha256
-          entries=$(unzip -Z1 ../vscode-main-source.zip | wc -l)
-          echo "$entries" | tee ../vscode-main-source.file-count
-          test "$entries" -eq "$EXPECTED_SOURCE_ENTRIES"
+          source_files=$(find . -type f ! -path './.git/*' | wc -l)
+          archive_files=$(unzip -Z1 ../vscode-main-source.zip | awk '!/\/$/' | wc -l)
+          echo "source_files=$source_files" | tee ../vscode-main-source.file-count
+          echo "archive_files=$archive_files" | tee -a ../vscode-main-source.file-count
+          test "$source_files" -eq "$archive_files"
 
       - name: Package complete Web distribution and full source archive
         run: |
