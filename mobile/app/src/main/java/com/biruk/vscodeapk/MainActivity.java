@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl("https://" + APP_ASSET_HOST + "/assets/vscode-web/index.html");
+        webView.loadUrl("https://" + APP_ASSET_HOST + "/assets/index.html");
     }
 
     @Override
