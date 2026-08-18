@@ -88,6 +88,15 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
       - name: Install VS Code dependencies
         working-directory: vscode-src/vscode-main
         run: npm ci --no-audit --no-fund
