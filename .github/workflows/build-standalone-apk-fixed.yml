@@ -3,14 +3,10 @@ name: Build Standalone VS Code APK (fixed)
 on:
   workflow_dispatch:
     inputs:
-      vscode_ref:
-        description: 'Official Microsoft/vscode ref to use when source_zip_url is empty'
-        required: false
-        default: 'main'
       source_zip_url:
-        description: 'Direct HTTPS URL to the exact vscode-main.zip supplied for this project'
+        description: 'Optional direct URL to replace the pinned VS Code 1.135.0 source ZIP'
         required: false
-        default: ''
+        default: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
   push:
     branches: [ main ]
 
@@ -19,6 +15,7 @@ permissions:
 
 env:
   NODE_VERSION: '24.18.0'
+  DEFAULT_SOURCE_ZIP_URL: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
 
 jobs:
   build:
@@ -27,10 +24,9 @@ jobs:
       - name: Checkout APK project
         uses: actions/checkout@v4
 
-      - name: Download exact supplied VS Code source ZIP
-        if: ${{ inputs.source_zip_url != '' }}
+      - name: Download exact VS Code 1.135.0 source ZIP
         env:
-          SOURCE_ZIP_URL: ${{ inputs.source_zip_url }}
+          SOURCE_ZIP_URL: ${{ inputs.source_zip_url || env.DEFAULT_SOURCE_ZIP_URL }}
         run: |
           set -euo pipefail
           rm -rf vscode-src
@@ -41,27 +37,13 @@ jobs:
           test -n "$ROOT"
           mv "$ROOT" vscode-src/vscode-main
           test -f vscode-src/vscode-main/package.json
-          VERSION="$(node -p \"require('./vscode-src/vscode-main/package.json').version\")"
+          VERSION="$(node -p "require('./vscode-src/vscode-main/package.json').version")"
           echo "Supplied source version: $VERSION"
           test "$VERSION" = '1.135.0'
-          echo "SOURCE_MODE=supplied" >> "$GITHUB_ENV"
 
-      - name: Checkout official VS Code source
-        if: ${{ inputs.source_zip_url == '' }}
-        uses: actions/checkout@v4
-        with:
-          repository: microsoft/vscode
-          ref: ${{ inputs.vscode_ref || 'main' }}
-          path: vscode-src/vscode-main
-          fetch-depth: 1
-
-      - name: Prepare and verify source archive
+      - name: Verify source archive integrity
         run: |
           set -euo pipefail
-          mkdir -p vscode-src
-          if [ "${SOURCE_MODE:-official}" != 'supplied' ]; then
-            (cd vscode-src/vscode-main && zip -qr ../vscode-main-source.zip . -x '.git/*')
-          fi
           sha256sum vscode-src/vscode-main-source.zip | tee vscode-src/vscode-main-source.zip.sha256
           SOURCE_COUNT="$(cd vscode-src/vscode-main && find . -type f ! -path './.git/*' | wc -l | tr -d ' ')"
           ARCHIVE_COUNT="$(unzip -Z1 vscode-src/vscode-main-source.zip | awk '!/\/$/' | wc -l | tr -d ' ')"
