@@ -1,4 +1,4 @@
-name: Build Offline VS Code APK
+name: Build Standalone VS Code APK
 
 on:
   workflow_dispatch:
@@ -54,22 +54,41 @@ jobs:
         working-directory: vscode-src/vscode-main
         run: npm ci --no-audit --no-fund
 
-      - name: Build VS Code Web distribution
+      - name: Compile VS Code Web workbench
         working-directory: vscode-src/vscode-main
-        run: npm run gulp vscode-web
+        run: npm run compile-web
 
-      - name: Copy VS Code Web into Android assets
+      - name: Compile built-in extensions for Web
+        working-directory: vscode-src/vscode-main
+        run: npm run compile-extensions-build
+
+      - name: Validate required Web files
+        working-directory: vscode-src/vscode-main
         run: |
-          rm -rf mobile/app/src/main/assets/vscode-web
-          mkdir -p mobile/app/src/main/assets/vscode-web
-          cp -R vscode-src/vscode-web/. mobile/app/src/main/assets/vscode-web/
-          test -f mobile/app/src/main/assets/vscode-web/index.html
+          test -f out/nls.messages.js
+          test -f out/vs/workbench/workbench.web.main.internal.js
+          test -f out/vs/workbench/workbench.web.main.internal.css
 
-      - name: Build Android debug APK
+      - name: Package the complete compiled Web tree into APK assets
+        run: |
+          rm -rf mobile/app/src/main/assets/vscode
+          mkdir -p mobile/app/src/main/assets/vscode/out
+          cp -R vscode-src/vscode-main/out/. mobile/app/src/main/assets/vscode/out/
+          if [ -d vscode-src/vscode-main/extensions ]; then
+            mkdir -p mobile/app/src/main/assets/vscode/extensions
+            cp -R vscode-src/vscode-main/extensions/. mobile/app/src/main/assets/vscode/extensions/
+          fi
+
+      - name: Build standalone Android debug APK
         working-directory: mobile
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Upload APK
+      - name: Verify APK exists
+        run: |
+          test -s mobile/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh mobile/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
           name: vscode-apk-debug
