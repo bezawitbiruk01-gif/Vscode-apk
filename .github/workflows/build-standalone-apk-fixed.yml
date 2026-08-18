@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: '22.14.0'
+  NODE_VERSION: '24.18.0'
   DEFAULT_SOURCE_ZIP_URL: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
   EXPECTED_SOURCE_SHA256: '59738cb82daa723a088d53148e98b4620ecfe43dbc78c007ce79ce0641243c69'
 
@@ -94,7 +94,7 @@ jobs:
 
       - name: Build VS Code Web distribution
         working-directory: vscode-src/vscode-main
-        run: npm run gulp vscode-web
+        run: npm run compile-web
 
       - name: Validate compiled Web distribution
         run: |
