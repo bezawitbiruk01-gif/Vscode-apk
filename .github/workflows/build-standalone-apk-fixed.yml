@@ -29,14 +29,21 @@ jobs:
       - name: Checkout APK project
         uses: actions/checkout@v4
 
+      - name: Setup Node.js before source inspection
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Download exact VS Code 1.135.0 source ZIP
         env:
           SOURCE_ZIP_URL: ${{ inputs.source_zip_url || env.DEFAULT_SOURCE_ZIP_URL }}
+        shell: bash
         run: |
           set -euo pipefail
           rm -rf vscode-src
           mkdir -p vscode-src/imported
           curl -fL --retry 4 --retry-all-errors "$SOURCE_ZIP_URL" -o vscode-src/vscode-main-source.zip
+          test -s vscode-src/vscode-main-source.zip
           echo "${EXPECTED_SOURCE_SHA256}  vscode-src/vscode-main-source.zip" | sha256sum -c -
           unzip -q vscode-src/vscode-main-source.zip -d vscode-src/imported
 
@@ -54,6 +61,7 @@ jobs:
           test "$VERSION" = '1.135.0'
 
       - name: Verify source archive integrity
+        shell: bash
         run: |
           set -euo pipefail
           sha256sum vscode-src/vscode-main-source.zip | tee vscode-src/vscode-main-source.zip.sha256
@@ -62,7 +70,7 @@ jobs:
           printf 'source_files=%s\narchive_files=%s\n' "$SOURCE_COUNT" "$ARCHIVE_COUNT" | tee vscode-src/vscode-main-source.file-count
           test "$SOURCE_COUNT" = "$ARCHIVE_COUNT"
 
-      - name: Setup Node.js
+      - name: Setup Node.js dependency cache
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -101,17 +109,13 @@ jobs:
           set -euo pipefail
           rm -rf mobile/app/src/main/assets
           mkdir -p mobile/app/src/main/assets
-
-          # Main Web app: MainActivity loads /assets/index.html.
           cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/
 
-          # Preserve the exact supplied source archive inside the APK.
           mkdir -p mobile/app/src/main/assets/source
           cp vscode-src/vscode-main-source.zip mobile/app/src/main/assets/source/
           cp vscode-src/vscode-main-source.zip.sha256 mobile/app/src/main/assets/source/
           cp vscode-src/vscode-main-source.file-count mobile/app/src/main/assets/source/
 
-          # Preserve the complete extracted source tree as well.
           mkdir -p mobile/app/src/main/assets/source-tree
           cp -R vscode-src/vscode-main/. mobile/app/src/main/assets/source-tree/
           rm -rf mobile/app/src/main/assets/source-tree/node_modules
@@ -126,6 +130,7 @@ jobs:
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Verify APK
+        shell: bash
         run: |
           set -euo pipefail
           APK='mobile/app/build/outputs/apk/debug/app-debug.apk'
