@@ -27,10 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout APK project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -65,13 +65,24 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum vscode-src/vscode-main-source.zip | tee vscode-src/vscode-main-source.zip.sha256
-          SOURCE_COUNT="$(cd vscode-src/vscode-main && find . -type f | wc -l | tr -d ' ')"
-          ARCHIVE_COUNT="$(unzip -Z1 vscode-src/vscode-main-source.zip | awk '!/\/$/' | wc -l | tr -d ' ')"
-          printf 'source_files=%s\narchive_files=%s\n' "$SOURCE_COUNT" "$ARCHIVE_COUNT" | tee vscode-src/vscode-main-source.file-count
-          test "$SOURCE_COUNT" = "$ARCHIVE_COUNT"
+
+          cd vscode-src/vscode-main
+          find . \( -type f -o -type l \) -printf '%P\n' | sort > /tmp/source-files.txt
+          cd - >/dev/null
+
+          unzip -Z1 vscode-src/vscode-main-source.zip \
+            | awk '!/\/$/ {sub(/^vscode-main\//, ""); print}' \
+            | sort > /tmp/archive-files.txt
+
+          SOURCE_COUNT="$(wc -l < /tmp/source-files.txt | tr -d ' ')"
+          ARCHIVE_COUNT="$(wc -l < /tmp/archive-files.txt | tr -d ' ')"
+          printf 'source_files=%s\narchive_files=%s\n' "$SOURCE_COUNT" "$ARCHIVE_COUNT" \
+            | tee vscode-src/vscode-main-source.file-count
+
+          diff -u /tmp/source-files.txt /tmp/archive-files.txt
 
       - name: Setup Node.js dependency cache
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
