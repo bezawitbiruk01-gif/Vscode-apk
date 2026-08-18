@@ -56,28 +56,32 @@ jobs:
 
       - name: Compile VS Code Web workbench
         working-directory: vscode-src/vscode-main
-        run: npm run compile-web
+        run: npm run gulp vscode-web
 
-      - name: Compile built-in extensions for Web
-        working-directory: vscode-src/vscode-main
-        run: npm run compile-extensions-build
-
-      - name: Validate required Web files
+      - name: Verify compiled Web distribution
         working-directory: vscode-src/vscode-main
         run: |
-          test -f out/nls.messages.js
-          test -f out/vs/workbench/workbench.web.main.internal.js
-          test -f out/vs/workbench/workbench.web.main.internal.css
+          test -f vscode-web/out/vs/workbench/workbench.web.main.internal.js
+          test -f vscode-web/out/vs/workbench/workbench.web.main.internal.css
+          test -f vscode-web/out/nls.messages.js
+          test -f vscode-web/package.json
 
-      - name: Package the complete compiled Web tree into APK assets
+      - name: Preserve the complete VS Code source inside the APK
+        working-directory: vscode-src/vscode-main
         run: |
-          rm -rf mobile/app/src/main/assets/vscode
-          mkdir -p mobile/app/src/main/assets/vscode/out
-          cp -R vscode-src/vscode-main/out/. mobile/app/src/main/assets/vscode/out/
-          if [ -d vscode-src/vscode-main/extensions ]; then
-            mkdir -p mobile/app/src/main/assets/vscode/extensions
-            cp -R vscode-src/vscode-main/extensions/. mobile/app/src/main/assets/vscode/extensions/
-          fi
+          zip -qr ../vscode-main-source.zip . -x '.git/*'
+          sha256sum ../vscode-main-source.zip | tee ../vscode-main-source.zip.sha256
+          unzip -Z1 ../vscode-main-source.zip | wc -l | tee ../vscode-main-source.file-count
+
+      - name: Package complete Web distribution and source archive
+        run: |
+          rm -rf mobile/app/src/main/assets/vscode-web
+          mkdir -p mobile/app/src/main/assets/vscode-web
+          cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/vscode-web/
+          cp vscode-src/vscode-main/../vscode-main-source.zip mobile/app/src/main/assets/
+          cp vscode-src/vscode-main/../vscode-main-source.zip.sha256 mobile/app/src/main/assets/
+          cp vscode-src/vscode-main/../vscode-main-source.file-count mobile/app/src/main/assets/
+          cp mobile/app/src/main/assets/index.html mobile/app/src/main/assets/launcher.html
 
       - name: Build standalone Android debug APK
         working-directory: mobile
