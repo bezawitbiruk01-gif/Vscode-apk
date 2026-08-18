@@ -29,7 +29,7 @@ jobs:
       - name: Checkout APK project
         uses: actions/checkout@v4
 
-      - name: Setup Node.js before source inspection
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -104,7 +104,7 @@ jobs:
           test -f vscode-src/vscode-main/vscode-web/out/nls.messages.js
           test -f vscode-src/vscode-main/vscode-web/package.json
 
-      - name: Package Web app and preserve complete source
+      - name: Package Web app and preserve complete source archive
         run: |
           set -euo pipefail
           rm -rf mobile/app/src/main/assets
@@ -116,14 +116,12 @@ jobs:
           cp vscode-src/vscode-main-source.zip.sha256 mobile/app/src/main/assets/source/
           cp vscode-src/vscode-main-source.file-count mobile/app/src/main/assets/source/
 
-          mkdir -p mobile/app/src/main/assets/source-tree
-          cp -R vscode-src/vscode-main/. mobile/app/src/main/assets/source-tree/
-          rm -rf mobile/app/src/main/assets/source-tree/node_modules
-          rm -rf mobile/app/src/main/assets/source-tree/vscode-web
-
           test -f mobile/app/src/main/assets/index.html
           test -f mobile/app/src/main/assets/source/vscode-main-source.zip
-          test -f mobile/app/src/main/assets/source-tree/package.json
+
+          echo '--- APK asset size report ---'
+          du -sh mobile/app/src/main/assets
+          du -sh mobile/app/src/main/assets/source/vscode-main-source.zip
 
       - name: Build standalone Android APK
         working-directory: mobile
