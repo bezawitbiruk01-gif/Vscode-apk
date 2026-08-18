@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>VS Code</title>
+  <link rel="stylesheet" href="./vscode/out/vs/workbench/workbench.web.main.internal.css">
+  <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#1e1e1e}body{font-family:system-ui,sans-serif}</style>
+</head>
+<body>
+<script>
+  globalThis._VSCODE_FILE_ROOT = new URL('./vscode/out/', window.location.href).toString();
+</script>
+<script src="./vscode/out/nls.messages.js"></script>
+<script type="module">
+  import { create } from './vscode/out/vs/workbench/workbench.web.main.internal.js';
+  create(document.body, {
+    configurationDefaults: {
+      'window.commandCenter': false,
+      'workbench.startupEditor': 'none',
+      'workbench.tips.enabled': false
+    }
+  });
+</script>
+</body>
+</html>
