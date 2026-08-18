@@ -18,8 +18,6 @@ env:
   DEFAULT_SOURCE_ZIP_URL: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
   EXPECTED_SOURCE_SHA256: '59738cb82daa723a088d53148e98b4620ecfe43dbc78c007ce79ce0641243c69'
 
-auto_cancel: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
