@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_zip_url:
-        description: 'Optional direct URL to replace the pinned VS Code 1.135.0 source ZIP'
+        description: 'Direct URL to the exact VS Code 1.135.0 source ZIP'
         required: false
         default: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
   push:
@@ -16,6 +16,9 @@ permissions:
 env:
   NODE_VERSION: '24.18.0'
   DEFAULT_SOURCE_ZIP_URL: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
+  EXPECTED_SOURCE_SHA256: '59738cb82daa723a088d53148e98b4620ecfe43dbc78c007ce79ce0641243c69'
+
+auto_cancel: false
 
 jobs:
   build:
@@ -32,6 +35,7 @@ jobs:
           rm -rf vscode-src
           mkdir -p vscode-src/imported
           curl -fL --retry 4 --retry-all-errors "$SOURCE_ZIP_URL" -o vscode-src/vscode-main-source.zip
+          echo "${EXPECTED_SOURCE_SHA256}  vscode-src/vscode-main-source.zip" | sha256sum -c -
           unzip -q vscode-src/vscode-main-source.zip -d vscode-src/imported
           ROOT="$(find vscode-src/imported -mindepth 1 -maxdepth 3 -type f -name package.json -print -quit | sed 's#/package.json$##')"
           test -n "$ROOT"
