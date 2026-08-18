@@ -1,0 +1,133 @@
+name: Build Standalone VS Code APK (fixed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      vscode_ref:
+        description: 'Official Microsoft/vscode ref to use when source_zip_url is empty'
+        required: false
+        default: 'main'
+      source_zip_url:
+        description: 'Direct HTTPS URL to the exact vscode-main.zip supplied for this project'
+        required: false
+        default: ''
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24.18.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout APK project
+        uses: actions/checkout@v4
+
+      - name: Download exact supplied VS Code source ZIP
+        if: ${{ inputs.source_zip_url != '' }}
+        env:
+          SOURCE_ZIP_URL: ${{ inputs.source_zip_url }}
+        run: |
+          set -euo pipefail
+          rm -rf vscode-src
+          mkdir -p vscode-src/imported
+          curl -fL --retry 4 --retry-all-errors "$SOURCE_ZIP_URL" -o vscode-src/vscode-main-source.zip
+          unzip -q vscode-src/vscode-main-source.zip -d vscode-src/imported
+          ROOT="$(find vscode-src/imported -mindepth 1 -maxdepth 3 -type f -name package.json -print -quit | sed 's#/package.json$##')"
+          test -n "$ROOT"
+          mv "$ROOT" vscode-src/vscode-main
+          test -f vscode-src/vscode-main/package.json
+          VERSION="$(node -p \"require('./vscode-src/vscode-main/package.json').version\")"
+          echo "Supplied source version: $VERSION"
+          test "$VERSION" = '1.135.0'
+          echo "SOURCE_MODE=supplied" >> "$GITHUB_ENV"
+
+      - name: Checkout official VS Code source
+        if: ${{ inputs.source_zip_url == '' }}
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/vscode
+          ref: ${{ inputs.vscode_ref || 'main' }}
+          path: vscode-src/vscode-main
+          fetch-depth: 1
+
+      - name: Prepare and verify source archive
+        run: |
+          set -euo pipefail
+          mkdir -p vscode-src
+          if [ "${SOURCE_MODE:-official}" != 'supplied' ]; then
+            (cd vscode-src/vscode-main && zip -qr ../vscode-main-source.zip . -x '.git/*')
+          fi
+          sha256sum vscode-src/vscode-main-source.zip | tee vscode-src/vscode-main-source.zip.sha256
+          SOURCE_COUNT="$(cd vscode-src/vscode-main && find . -type f ! -path './.git/*' | wc -l | tr -d ' ')"
+          ARCHIVE_COUNT="$(unzip -Z1 vscode-src/vscode-main-source.zip | awk '!/\/$/' | wc -l | tr -d ' ')"
+          printf 'source_files=%s\narchive_files=%s\n' "$SOURCE_COUNT" "$ARCHIVE_COUNT" | tee vscode-src/vscode-main-source.file-count
+          test "$SOURCE_COUNT" = "$ARCHIVE_COUNT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: vscode-src/vscode-main/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Install VS Code dependencies
+        working-directory: vscode-src/vscode-main
+        run: npm ci --no-audit --no-fund
+
+      - name: Build VS Code Web distribution
+        working-directory: vscode-src/vscode-main
+        run: npm run gulp vscode-web
+
+      - name: Validate compiled Web distribution
+        run: |
+          set -euo pipefail
+          test -f vscode-src/vscode-main/vscode-web/out/vs/workbench/workbench.web.main.internal.js
+          test -f vscode-src/vscode-main/vscode-web/out/vs/workbench/workbench.web.main.internal.css
+          test -f vscode-src/vscode-main/vscode-web/out/nls.messages.js
+          test -f vscode-src/vscode-main/vscode-web/package.json
+
+      - name: Package Web assets and complete source archive
+        run: |
+          set -euo pipefail
+          rm -rf mobile/app/src/main/assets/vscode
+          mkdir -p mobile/app/src/main/assets/vscode
+          cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/vscode/
+          cp vscode-src/vscode-main-source.zip mobile/app/src/main/assets/
+          cp vscode-src/vscode-main-source.zip.sha256 mobile/app/src/main/assets/
+          cp vscode-src/vscode-main-source.file-count mobile/app/src/main/assets/
+          test -f mobile/app/src/main/assets/index.html
+
+      - name: Build standalone Android APK
+        working-directory: mobile
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify APK
+        run: |
+          set -euo pipefail
+          test -s mobile/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum mobile/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh mobile/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload standalone APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-apk-debug
+          path: mobile/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
