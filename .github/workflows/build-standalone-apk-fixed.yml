@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vscode-apk-build
+  cancel-in-progress: false
+
 env:
   NODE_VERSION: '24.18.0'
   DEFAULT_SOURCE_ZIP_URL: 'https://github.com/bezawitbiruk01-gif/Vscode-apk/releases/download/v1.135.0-source/vscode-main.zip'
@@ -35,8 +39,14 @@ jobs:
           curl -fL --retry 4 --retry-all-errors "$SOURCE_ZIP_URL" -o vscode-src/vscode-main-source.zip
           echo "${EXPECTED_SOURCE_SHA256}  vscode-src/vscode-main-source.zip" | sha256sum -c -
           unzip -q vscode-src/vscode-main-source.zip -d vscode-src/imported
-          ROOT="$(find vscode-src/imported -mindepth 1 -maxdepth 3 -type f -name package.json -print -quit | sed 's#/package.json$##')"
-          test -n "$ROOT"
+
+          ROOTS="$(find vscode-src/imported -mindepth 1 -maxdepth 1 -type d -print)"
+          ROOT_COUNT="$(printf '%s\n' "$ROOTS" | sed '/^$/d' | wc -l | tr -d ' ')"
+          TOP_FILE_COUNT="$(find vscode-src/imported -mindepth 1 -maxdepth 1 -type f -print | wc -l | tr -d ' ')"
+          test "$ROOT_COUNT" = '1'
+          test "$TOP_FILE_COUNT" = '0'
+
+          ROOT="$(printf '%s\n' "$ROOTS" | head -n 1)"
           mv "$ROOT" vscode-src/vscode-main
           test -f vscode-src/vscode-main/package.json
           VERSION="$(node -p "require('./vscode-src/vscode-main/package.json').version")"
@@ -47,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum vscode-src/vscode-main-source.zip | tee vscode-src/vscode-main-source.zip.sha256
-          SOURCE_COUNT="$(cd vscode-src/vscode-main && find . -type f ! -path './.git/*' | wc -l | tr -d ' ')"
+          SOURCE_COUNT="$(cd vscode-src/vscode-main && find . -type f | wc -l | tr -d ' ')"
           ARCHIVE_COUNT="$(unzip -Z1 vscode-src/vscode-main-source.zip | awk '!/\/$/' | wc -l | tr -d ' ')"
           printf 'source_files=%s\narchive_files=%s\n' "$SOURCE_COUNT" "$ARCHIVE_COUNT" | tee vscode-src/vscode-main-source.file-count
           test "$SOURCE_COUNT" = "$ARCHIVE_COUNT"
@@ -86,16 +96,30 @@ jobs:
           test -f vscode-src/vscode-main/vscode-web/out/nls.messages.js
           test -f vscode-src/vscode-main/vscode-web/package.json
 
-      - name: Package Web assets and complete source archive
+      - name: Package Web app and preserve complete source
         run: |
           set -euo pipefail
-          rm -rf mobile/app/src/main/assets/vscode
-          mkdir -p mobile/app/src/main/assets/vscode
-          cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/vscode/
-          cp vscode-src/vscode-main-source.zip mobile/app/src/main/assets/
-          cp vscode-src/vscode-main-source.zip.sha256 mobile/app/src/main/assets/
-          cp vscode-src/vscode-main-source.file-count mobile/app/src/main/assets/
+          rm -rf mobile/app/src/main/assets
+          mkdir -p mobile/app/src/main/assets
+
+          # Main Web app: MainActivity loads /assets/index.html.
+          cp -R vscode-src/vscode-main/vscode-web/. mobile/app/src/main/assets/
+
+          # Preserve the exact supplied source archive inside the APK.
+          mkdir -p mobile/app/src/main/assets/source
+          cp vscode-src/vscode-main-source.zip mobile/app/src/main/assets/source/
+          cp vscode-src/vscode-main-source.zip.sha256 mobile/app/src/main/assets/source/
+          cp vscode-src/vscode-main-source.file-count mobile/app/src/main/assets/source/
+
+          # Preserve the complete extracted source tree as well.
+          mkdir -p mobile/app/src/main/assets/source-tree
+          cp -R vscode-src/vscode-main/. mobile/app/src/main/assets/source-tree/
+          rm -rf mobile/app/src/main/assets/source-tree/node_modules
+          rm -rf mobile/app/src/main/assets/source-tree/vscode-web
+
           test -f mobile/app/src/main/assets/index.html
+          test -f mobile/app/src/main/assets/source/vscode-main-source.zip
+          test -f mobile/app/src/main/assets/source-tree/package.json
 
       - name: Build standalone Android APK
         working-directory: mobile
@@ -104,9 +128,10 @@ jobs:
       - name: Verify APK
         run: |
           set -euo pipefail
-          test -s mobile/app/build/outputs/apk/debug/app-debug.apk
-          sha256sum mobile/app/build/outputs/apk/debug/app-debug.apk
-          ls -lh mobile/app/build/outputs/apk/debug/app-debug.apk
+          APK='mobile/app/build/outputs/apk/debug/app-debug.apk'
+          test -s "$APK"
+          sha256sum "$APK"
+          ls -lh "$APK"
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
